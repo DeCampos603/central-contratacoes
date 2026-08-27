@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Central de Contratações</title>
+<link rel="stylesheet" href="assets/comum.css">
+</head>
+<body>
+
+<header>
+  <div class="topo">
+    <h1>Central de Contratações</h1>
+    <div class="sub">Licitações abertas, atas para adesão e risco do fornecedor — em um lugar só.</div>
+  </div>
+  <div class="abas" role="tablist" aria-label="Seções">
+    <button role="tab" data-aba="procurador" aria-selected="false" aria-controls="painel-procurador">
+      Procurador<span class="rotulo-modo">ao vivo</span>
+    </button>
+    <button role="tab" data-aba="adesao" aria-selected="false" aria-controls="painel-adesao">
+      Adesão<span class="rotulo-modo" id="modo-adesao">dados do dia</span>
+    </button>
+    <button role="tab" data-aba="raiox" aria-selected="false" aria-controls="painel-raiox">
+      Raio-X<span class="rotulo-modo">ao vivo</span>
+    </button>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================ PROCURADOR -->
+<section id="painel-procurador" role="tabpanel" aria-labelledby="procurador" hidden>
+  <div id="erro-proc" class="aviso" hidden></div>
+
+  <div class="busca">
+    <input type="search" id="proc-q" autocomplete="off" spellcheck="false"
+           placeholder="O que você procura? Ex.: oxigênio medicinal, armário de aço, manutenção predial">
+    <p class="dica">Busca direto no PNCP, em tempo real. Deixe em branco para filtrar só por UF e situação.</p>
+  </div>
+
+  <div class="filtros">
+    <select id="proc-tipo">
+      <option value="edital">Editais e avisos de contratação</option>
+      <option value="ata">Atas de registro de preços</option>
+      <option value="contrato">Contratos</option>
+    </select>
+    <select id="proc-status">
+      <option value="">Qualquer situação</option>
+      <option value="recebendo_proposta">Recebendo proposta</option>
+      <option value="em_julgamento">Em julgamento</option>
+      <option value="encerradas">Encerradas</option>
+    </select>
+    <select id="proc-uf"><option value="">Todas as UF</option></select>
+    <select id="proc-esfera">
+      <option value="">Todas as esferas</option>
+      <option value="F">Federal</option>
+      <option value="E">Estadual</option>
+      <option value="M">Municipal</option>
+    </select>
+    <button class="acao primaria estreito" id="proc-buscar">Pesquisar</button>
+  </div>
+
+  <p class="resumo" id="proc-resumo"></p>
+  <div class="tabela">
+    <table>
+      <thead><tr>
+        <th>Objeto</th>
+        <th>Órgão / Unidade</th>
+        <th>Modalidade</th>
+        <th>Situação</th>
+        <th class="num">Valor</th>
+        <th>Local</th>
+        <th></th>
+      </tr></thead>
+      <tbody id="proc-corpo"></tbody>
+    </table>
+  </div>
+  <div class="vazio" id="proc-vazio" hidden>Nenhum resultado.</div>
+  <div style="text-align:center;margin-top:14px">
+    <button class="acao" id="proc-mais" hidden>Carregar mais</button>
+  </div>
+
+  <p class="rodape">
+    Fonte: busca pública do PNCP (<code>pncp.gov.br/api/search</code>), consultada
+    pelo seu navegador no momento em que você pesquisa — nada aqui é dado
+    guardado. Uma ata marcada como <b>permite adesão</b> pode ter itens na aba
+    Adesão.
+  </p>
+</section>
+
+<!-- ================================================================ ADESÃO -->
+<section id="painel-adesao" role="tabpanel" aria-labelledby="adesao" hidden>
+  <div id="erro-adesao" class="aviso" hidden></div>
+  <div id="aviso-saldo" class="aviso aviso-alerta" hidden></div>
+
+  <div class="busca">
+    <input type="search" id="ad-q" autocomplete="off" spellcheck="false"
+           placeholder="O que você precisa comprar? Ex.: armário aço, oxigênio, cadeira, papel a4">
+    <p class="dica">Busque pelo grupo do item. Depois refine pela descrição, órgão ou fornecedor.</p>
+    <ul class="sugestoes" id="ad-sugestoes" hidden role="listbox"></ul>
+  </div>
+
+  <div id="ad-painel" hidden>
+    <div class="filtros">
+      <input type="text" id="ad-filtro" placeholder="Refinar na descrição (ex.: epóxi preto)">
+      <select id="ad-uasg"><option value="">Todos os órgãos</option></select>
+      <select id="ad-fornecedor"><option value="">Todos os fornecedores</option></select>
+      <select id="ad-dias">
+        <option value="0">Qualquer vigência</option>
+        <option value="60">Vigente por 60+ dias</option>
+        <option value="120">Vigente por 120+ dias</option>
+        <option value="180">Vigente por 180+ dias</option>
+      </select>
+      <label class="caixa-check estreito">
+        <input type="checkbox" id="ad-so-saldo"> Só com saldo confirmado
+      </label>
+      <label class="caixa-check estreito"
+             title="Boa parte dos itens tem limite de adesão zero — a ata não admite carona">
+        <input type="checkbox" id="ad-incluir-vedados"> Incluir os que não permitem
+      </label>
+    </div>
+    <p class="resumo" id="ad-resumo"></p>
+    <div class="tabela">
+      <table>
+        <thead><tr>
+          <th data-ordem="valor">Valor unit.</th>
+          <th data-ordem="desc">Descrição</th>
+          <th data-ordem="uasg">Órgão gerenciador</th>
+          <th data-ordem="ata">Ata / Item</th>
+          <th data-ordem="fornecedor">Fornecedor</th>
+          <th data-ordem="registrada">Qtd registrada</th>
+          <th data-ordem="adesao">Limite adesão</th>
+          <th data-ordem="saldo">Saldo</th>
+          <th data-ordem="dias">Vigência</th>
+          <th></th>
+        </tr></thead>
+        <tbody id="ad-corpo"></tbody>
+      </table>
+    </div>
+    <div class="vazio" id="ad-vazio" hidden>Nenhum item com esses filtros.</div>
+  </div>
+
+  <p class="rodape" id="ad-rodape"></p>
+</section>
+
+<!-- ================================================================ RAIO-X -->
+<section id="painel-raiox" role="tabpanel" aria-labelledby="raiox" hidden>
+  <div id="erro-raiox" class="aviso" hidden></div>
+
+  <div class="filtros">
+    <input type="text" id="rx-cnpj" inputmode="numeric" autocomplete="off"
+           placeholder="CNPJ do fornecedor — ex.: 00.000.000/0001-91">
+    <button class="acao primaria estreito" id="rx-consultar">Consultar</button>
+  </div>
+  <p class="dica" id="rx-dica">
+    A consulta é feita na hora, em bases públicas. A primeira do dia pode demorar
+    mais, porque o serviço hiberna quando fica ocioso.
+  </p>
+
+  <div id="rx-resultado" hidden></div>
+
+  <p class="rodape">
+    O Raio-X distingue <b>“consultei e nada consta”</b> de <b>“não consegui
+    consultar”</b>. Fonte fora do ar aparece como <i>não consultada</i>, nunca
+    como ausência de achado — um dossiê que confunde as duas coisas mente
+    exatamente quando mais importa.
+  </p>
+</section>
+
+</main>
+
+<dialog id="dlg">
+  <div class="dlg-corpo">
+    <h2 id="dlg-titulo">Detalhes</h2>
+    <div id="dlg-campos"></div>
+  </div>
+  <div class="dlg-pe">
+    <button class="acao" id="dlg-fechar">Fechar</button>
+    <button class="acao" id="dlg-raiox" hidden>Raio-X deste fornecedor</button>
+    <button class="acao primaria" id="dlg-copiar">Copiar tudo</button>
+  </div>
+</dialog>
+
+<script src="assets/config.js"></script>
+<script src="assets/comum.js"></script>
+<script src="assets/procurador.js"></script>
+<script src="assets/adesao.js"></script>
+<script src="assets/raiox.js"></script>
+<script>
+  const trocarAba = iniciarAbas();
+  iniciarProcurador();
+  iniciarAdesao(trocarAba);
+  iniciarRaiox();
+  document.getElementById("dlg-fechar")
+    .addEventListener("click", () => document.getElementById("dlg").close());
+</script>
+</body>
+</html>

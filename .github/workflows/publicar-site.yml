@@ -1,0 +1,78 @@
+name: Publicar a Central de Contratações
+
+# Gera os dados da aba ADESÃO e publica o site no GitHub Pages.
+#
+# Só a Adesão precisa disto. As outras duas abas consultam ao vivo do navegador:
+# o PNCP e a API do Raio-X mandam Access-Control-Allow-Origin, e a API de dados
+# abertos do Compras.gov.br não manda — por isso ela, e só ela, é pré-gerada.
+#
+# Custo medido (26/08/2026):
+#   varredura nacional de 24 meses ... ~2.540 páginas x 1,3 s  ~= 55 min
+#   verificação de saldo ............. 0,57 s/item com 6 threads
+#     (5.000 itens ~= 47 min; ~1,8% falham e ficam como "não verificado")
+
+on:
+  schedule:
+    - cron: "40 9 * * *"        # 06h40 em Brasília (UTC-3)
+  workflow_dispatch:
+    inputs:
+      meses:
+        description: "Janela retroativa de início de vigência, em meses"
+        default: "24"
+      dias_min:
+        description: "Vigência restante mínima, em dias"
+        default: "30"
+      saldo:
+        description: "Quantos itens têm o saldo real verificado (0 desliga)"
+        default: "5000"
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330          # o limite do runner é 360; deixa margem
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Gerar os dados
+        run: |
+          python gerar_site.py \
+            --meses "${{ github.event.inputs.meses || '24' }}" \
+            --dias-min "${{ github.event.inputs.dias_min || '30' }}" \
+            --saldo "${{ github.event.inputs.saldo || '5000' }}" \
+            --threads 6
+
+      - name: Conferir o que foi gerado
+        run: |
+          python - <<'PY'
+          import json, pathlib
+          d = json.loads(pathlib.Path("site/data/indice.json").read_text(encoding="utf-8"))
+          print(f"{d['totalItens']} itens | {d['totalAtas']} atas | {d['totalPdms']} PDMs "
+                f"| {d['comSaldoVerificado']} com saldo verificado")
+          # Falha cedo, em vez de publicar um site vazio por cima de um bom.
+          assert d["totalItens"] > 0, "nenhum item coletado"
+          assert d["totalPdms"] > 0, "nenhum PDM gerado"
+          PY
+          du -sh site/data
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deploy
+        uses: actions/deploy-pages@v4

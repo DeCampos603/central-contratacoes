@@ -1,0 +1,5 @@
+cache*/
+saida/
+site/data/
+__pycache__/
+*.sqlite
