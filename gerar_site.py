@@ -272,6 +272,18 @@ def escrever(itens: list[dict], *, hoje: date, log=print) -> dict:
         ])
 
     indice.sort(key=lambda r: -r[7])   # mais itens ADERIVEIS primeiro
+
+    # Indice por fornecedor, para a busca por CNPJ: [cnpj, nome, itens, [pdms]].
+    forn: dict[str, list] = {}
+    for it in itens:
+        cnpj = re.sub(r"\D", "", it.get("niFornecedor") or "")
+        if not cnpj:
+            continue
+        f = forn.setdefault(cnpj, [cnpj, it.get("nomeRazaoSocialFornecedor") or "", 0, set()])
+        f[2] += 1
+        f[3].add(int(it.get("codigoPdm") or 0))
+    fornecedores_idx = sorted(([c, n, q, sorted(p)] for c, n, q, p in forn.values()),
+                              key=lambda r: -r[2])
     resumo = {
         "gerado": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "referencia": hoje.isoformat(),
@@ -283,6 +295,7 @@ def escrever(itens: list[dict], *, hoje: date, log=print) -> dict:
         "totalAderiveis": sum(1 for it in itens if _num(it.get("maximoAdesao")) > 0),
         "comSaldoVerificado": sum(1 for it in itens if it.get("_saldo") is not None),
         "pdms": indice,
+        "fornecedores": fornecedores_idx,
     }
     alvo = DIR_DADOS / "indice.json"
     alvo.write_text(json.dumps(resumo, ensure_ascii=False,

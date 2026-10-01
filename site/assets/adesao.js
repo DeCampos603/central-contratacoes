@@ -70,10 +70,35 @@ async function carregarIndiceAdesao() {
   return true;
 }
 
+// Texto só de dígitos e pontuação, com 4+ dígitos, é busca por CNPJ.
+function digitosDeCnpj(texto) {
+  return /^[\d.\/\-\s]+$/.test(texto) ? texto.replace(/\D/g, "") : "";
+}
+
+function sugerirPorCnpj(digitos, lista) {
+  const achados = (adIndice.fornecedores || [])
+    .filter(f => f[0].includes(digitos)).slice(0, 40);
+  if (!achados.length) {
+    lista.innerHTML = `<li aria-disabled="true"><span class="nome">Nenhum fornecedor com ata aderível para o CNPJ “${
+      escaparHtml($("#ad-q").value)}”.</span></li>`;
+  } else {
+    lista.innerHTML = achados.map(f =>
+      `<li role="option" data-cnpj="${f[0]}">
+         <span class="nome">${escaparHtml(f[1])}</span>
+         <span class="meta">${cnpjFormatado(f[0])} · ${num(f[2])} itens · ${
+           f[3].length} grupo${f[3].length > 1 ? "s" : ""}</span>
+       </li>`).join("");
+  }
+  adMarcado = -1;
+  lista.hidden = false;
+}
+
 function sugerirAdesao() {
   const termos = semAcento($("#ad-q").value).split(/\s+/).filter(Boolean);
   const lista = $("#ad-sugestoes");
   if (!adIndice || !termos.length) { lista.hidden = true; return; }
+  const digitos = digitosDeCnpj($("#ad-q").value);
+  if (digitos.length >= 4) return sugerirPorCnpj(digitos, lista);
   const achados = adIndice.pdms
     .map(p => [p, pontuar(p, termos)])
     .filter(([, n]) => n > 0)
@@ -109,6 +134,49 @@ async function abrirPdm(codigo, nome) {
     mostrarErro("#erro-adesao", "Falha ao carregar este grupo.", e.message);
     return;
   }
+  mostrarFatia();
+}
+
+// Todos os itens de um fornecedor, juntando as fatias de cada grupo (PDM) em que
+// ele aparece. Os dicionários d/u/f de cada fatia são remapeados para um só.
+async function abrirFornecedor(cnpj) {
+  const reg = (adIndice.fornecedores || []).find(f => f[0] === cnpj);
+  if (!reg) return;
+  $("#ad-sugestoes").hidden = true;
+  $("#ad-q").value = cnpjFormatado(cnpj);
+  $("#ad-resumo").innerHTML = `<span class="carregando"></span>Carregando…`;
+  $("#ad-painel").hidden = false;
+  let fatias;
+  try {
+    fatias = await Promise.all(reg[3].map(p =>
+      buscarJson(`data/pdm/${encodeURIComponent(p)}.json`, { tentativas: 1 })));
+  } catch (e) {
+    $("#ad-resumo").textContent = "";
+    mostrarErro("#erro-adesao", "Falha ao carregar os itens deste fornecedor.", e.message);
+    return;
+  }
+  const d = [], u = [], f = [], itens = [];
+  const iD = new Map(), iU = new Map(), iF = new Map();
+  const mapa = (m, lista, chave, valor) => {
+    if (!m.has(chave)) { m.set(chave, lista.length); lista.push(valor); }
+    return m.get(chave);
+  };
+  for (const fa of fatias) {
+    for (const it of fa.itens) {
+      const forn = fa.f[it[FORN]];
+      if (String(forn[0]).replace(/\D/g, "") !== cnpj) continue;
+      const novo = it.slice();
+      novo[DESC] = mapa(iD, d, fa.d[it[DESC]], fa.d[it[DESC]]);
+      novo[UNI] = mapa(iU, u, fa.u[it[UNI]][0], fa.u[it[UNI]]);
+      novo[FORN] = mapa(iF, f, forn[0], forn);
+      itens.push(novo);
+    }
+  }
+  adFatia = { nome: "Fornecedor " + reg[1], d, u, f, itens };
+  mostrarFatia();
+}
+
+function mostrarFatia() {
   limparErro("#erro-adesao");
   preencher("#ad-uasg", adFatia.u, "Todos os órgãos", u => `${u[0]} — ${u[1]}`);
   preencher("#ad-fornecedor", adFatia.f, "Todos os fornecedores", f => f[1] || f[0]);
@@ -214,7 +282,7 @@ function iniciarAdesao(trocarAba) {
 
   $("#ad-q").addEventListener("input", sugerirAdesao);
   $("#ad-q").addEventListener("keydown", e => {
-    const itens = $$("#ad-sugestoes li[data-pdm]");
+    const itens = $$("#ad-sugestoes li[data-pdm], #ad-sugestoes li[data-cnpj]");
     if (!itens.length) return;
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       e.preventDefault();
@@ -226,8 +294,10 @@ function iniciarAdesao(trocarAba) {
     } else if (e.key === "Escape") { $("#ad-sugestoes").hidden = true; }
   });
   $("#ad-sugestoes").addEventListener("click", e => {
-    const li = e.target.closest("li[data-pdm]");
-    if (li) abrirPdm(li.dataset.pdm, li.querySelector(".nome").textContent);
+    const li = e.target.closest("li[data-pdm], li[data-cnpj]");
+    if (!li) return;
+    if (li.dataset.cnpj) abrirFornecedor(li.dataset.cnpj);
+    else abrirPdm(li.dataset.pdm, li.querySelector(".nome").textContent);
   });
   document.addEventListener("click", e => {
     if (!e.target.closest("#painel-adesao .busca")) $("#ad-sugestoes").hidden = true;
