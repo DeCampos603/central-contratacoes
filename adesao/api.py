@@ -126,9 +126,27 @@ class Cliente:
         saida: list[dict] = []
         pagina = 1
         total_paginas = None
+        puladas = 0
         while True:
             p = dict(params, pagina=pagina, tamanhoPagina=tam_pagina)
-            dados = self._get(endpoint, p)
+            try:
+                dados = self._get(endpoint, p, tentativas=6)
+            except ApiErro as e:
+                # Varreduras de milhares de paginas sempre perdem algumas para
+                # timeout; abortar tudo por uma pagina jogava fora ~1h de coleta.
+                # A primeira pagina e a lista de paginas e tem de funcionar; no
+                # resto tolera-se uma fracao pequena, e o log registra o furo.
+                if total_paginas is None or str(e).startswith("HTTP 400"):
+                    raise
+                puladas += 1
+                self.log(f"  pagina {pagina}/{total_paginas} descartada: {e}")
+                if puladas > max(5, total_paginas * 0.02):
+                    raise ApiErro(f"{puladas} paginas falharam de {total_paginas}; "
+                                  f"abortando") from None
+                if pagina >= total_paginas:
+                    break
+                pagina += 1
+                continue
             lote = dados.get("resultado") or []
             saida.extend(lote)
             if total_paginas is None:
@@ -143,6 +161,8 @@ class Cliente:
                          f"(de {total_paginas}) por limite pedido")
                 break
             pagina += 1
+        if puladas:
+            self.log(f"  ATENCAO: {puladas} pagina(s) sem dados em {rotulo or endpoint}")
         return saida
 
     # ------------------------------------------------------------ consultas
