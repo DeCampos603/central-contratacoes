@@ -121,3 +121,26 @@ dialog::backdrop{background:rgba(8,14,20,.55)}
   animation:girar .7s linear infinite;vertical-align:-2px;margin-right:7px}
 @keyframes girar{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.carregando{animation-duration:2.5s}}
+
+/* ------------------------------------------------------------- responsivo */
+@media (max-width: 680px) {
+  .topo{padding:10px 14px 0}
+  h1{font-size:16px}
+  .abas{padding:0 12px; gap:2px}
+  .abas button{padding:9px 12px; font-size:14px}
+  main{padding:12px 14px 40px}
+  .filtros{gap:8px}
+  .filtros>*{flex:1 1 100%; min-width:0}
+  .filtros button.acao{width:100%}
+  .tabela::before{
+    content:"👉 Deslize horizontalmente para ver dados e situação";
+    display:block; font-size:11.5px; font-weight:600; color:var(--fraco);
+    padding:8px 12px; background:var(--bg); border-bottom:1px dashed var(--borda);
+  }
+  table{font-size:12.5px; min-width:720px}
+  th,td{padding:8px 10px}
+  dialog{width:96vw; max-height:92vh}
+  .dlg-corpo{padding:14px 16px}
+  .dlg-pe{padding:10px 16px}
+}
+
