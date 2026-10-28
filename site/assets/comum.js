@@ -13,12 +13,21 @@ const escaparHtml = s => String(s == null ? "" : s)
   .replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;",
                                '"': "&quot;", "'": "&#39;" }[c]));
 
-const moeda = n => (n == null ? "—" : n.toLocaleString("pt-BR",
-  { style: "currency", currency: "BRL", minimumFractionDigits: 2,
-    maximumFractionDigits: 4 }));
+const moeda = n => {
+  if (n == null) return "—";
+  let v = Number(n) || 0;
+  if (Math.abs(v) < 0.00005) v = 0;
+  return v.toLocaleString("pt-BR",
+    { style: "currency", currency: "BRL", minimumFractionDigits: 2,
+      maximumFractionDigits: 4 });
+};
 
-const num = n => (n == null ? "—" : n.toLocaleString("pt-BR",
-  { maximumFractionDigits: 2 }));
+const num = n => {
+  if (n == null) return "—";
+  let v = Number(n) || 0;
+  if (Math.abs(v) < 0.005) v = 0;
+  return v.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+};
 
 const dia = s => {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s || "");
